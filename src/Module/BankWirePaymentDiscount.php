@@ -5,6 +5,7 @@ namespace PrestaShop\Module\BankWirePaymentDiscount\Module;
 use Cart;
 use CartRule;
 use Configuration;
+use Db;
 use HelperForm;
 use Language;
 use Module;
@@ -20,6 +21,7 @@ class BankWirePaymentDiscount extends Module
     public const DEFAULT_DISCOUNT_PERCENT = 5.0;
     public const DEFAULT_ENABLED = true;
     public const CART_RULE_PREFIX = 'BANKWIRE_DISCOUNT_';
+    private const BANK_WIRE_MODULE_NAMES = ['ps_wirepayment', 'bankwire'];
     private const MODULE_FILE = __DIR__ . '/../../bankwirepaymentdiscount.php';
 
 
@@ -203,7 +205,13 @@ class BankWirePaymentDiscount extends Module
      */
     public function isDiscountEnabled(): bool
     {
-        return (bool) Configuration::get(self::CONFIG_KEY_ENABLED, self::DEFAULT_ENABLED);
+        return (bool) Configuration::get(
+            self::CONFIG_KEY_ENABLED,
+            null,
+            null,
+            null,
+            (int) self::DEFAULT_ENABLED
+        );
     }
 
     /**
@@ -211,7 +219,13 @@ class BankWirePaymentDiscount extends Module
      */
     public function getConfiguredDiscountPercent(): float
     {
-        return (float) Configuration::get(self::CONFIG_KEY_PERCENT, self::DEFAULT_DISCOUNT_PERCENT);
+        return (float) Configuration::get(
+            self::CONFIG_KEY_PERCENT,
+            null,
+            null,
+            null,
+            (float) self::DEFAULT_DISCOUNT_PERCENT
+        );
     }
 
     /**
@@ -372,6 +386,8 @@ class BankWirePaymentDiscount extends Module
             }
         }
 
+        $bankWireModuleIds = $this->getBankWireModuleIds();
+
         // Create a new cart rule for this discount
         $cartRule = new CartRule();
         $cartRule->name = [];
@@ -389,7 +405,7 @@ class BankWirePaymentDiscount extends Module
         $cartRule->reduction_percent = $discountPercent;
         $cartRule->reduction_tax = 1;
         $cartRule->active = 1;
-        $cartRule->cart_rule_restriction = 0;
+        $cartRule->cart_rule_restriction = empty($bankWireModuleIds) ? 0 : 1;
         $cartRule->customer_restriction = $cartRule->id_customer > 0 ? 1 : 0;
         $cartRule->reduction_currency = (int) $cart->id_currency;
         $cartRule->minimum_amount_currency = (int) $cart->id_currency;
@@ -398,11 +414,45 @@ class BankWirePaymentDiscount extends Module
         $cartRule->partial_use = 0;
 
         if ($cartRule->add()) {
+            if (!empty($bankWireModuleIds)) {
+                $idShop = (int) $this->context->shop->id;
+
+                foreach ($bankWireModuleIds as $moduleId) {
+                    Db::getInstance()->insert(
+                        'cart_rule_module',
+                        [
+                            'id_cart_rule' => (int) $cartRule->id,
+                            'id_module' => $moduleId,
+                            'id_shop' => $idShop,
+                        ]
+                    );
+                }
+            }
             // Add the cart rule to the cart
             $cart->addCartRule($cartRule->id);
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Retrieve the IDs of available bank wire payment modules.
+     *
+     * @return int[]
+     */
+    private function getBankWireModuleIds(): array
+    {
+        $moduleIds = [];
+
+        foreach (self::BANK_WIRE_MODULE_NAMES as $moduleName) {
+            $moduleInstance = Module::getInstanceByName($moduleName);
+
+            if ($moduleInstance !== false && $moduleInstance->id) {
+                $moduleIds[] = (int) $moduleInstance->id;
+            }
+        }
+
+        return array_unique($moduleIds);
     }
 }
