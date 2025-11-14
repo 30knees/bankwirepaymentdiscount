@@ -1,0 +1,51 @@
+name: Create Module Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create module package
+        run: |
+          # Create properly structured zip using git archive
+          git archive --format=zip --prefix=bankwirepaymentdiscount/ -o bankwirepaymentdiscount-v${{ steps.get_version.outputs.VERSION }}.zip HEAD
+
+          # Verify the zip was created
+          ls -lh bankwirepaymentdiscount-v${{ steps.get_version.outputs.VERSION }}.zip
+
+          # Show contents for verification
+          echo "Package contents:"
+          unzip -l bankwirepaymentdiscount-v${{ steps.get_version.outputs.VERSION }}.zip | head -20
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: bankwirepaymentdiscount-v${{ steps.get_version.outputs.VERSION }}.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "✅ Release created successfully!"
+          echo "📦 Package: bankwirepaymentdiscount-v${{ steps.get_version.outputs.VERSION }}.zip"
+          echo "🏷️  Tag: v${{ steps.get_version.outputs.VERSION }}"
+          echo ""
+          echo "The zip file is ready for upload to PrestaShop 8.2 Module Manager."

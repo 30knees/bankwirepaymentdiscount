@@ -72,24 +72,39 @@ This module provides a configurable discount for customers who choose to pay via
 
 ### Creating Distribution Package
 
-To create a distribution package for this module:
+#### Automated Release (Recommended)
+
+The repository includes GitHub Actions workflow for automated releases:
+
+1. Create and push a new tag:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+2. GitHub Actions will automatically:
+   - Create a properly structured zip file
+   - Generate release notes
+   - Publish a GitHub release with the zip attached
+
+3. Download the zip from the Releases page and upload to PrestaShop
+
+#### Manual Package Creation
+
+To create a distribution package manually:
 
 ```bash
 # Clone or navigate to the module directory
 cd prestashop-bankwire-discount
 
-# If using composer dependencies (optional):
-composer install --no-dev --optimize-autoloader
-
 # Create the zip file (excludes git and development files)
 git archive --format=zip --prefix=bankwirepaymentdiscount/ -o bankwirepaymentdiscount.zip HEAD
 
-# Or manually create zip with required files only
-zip -r bankwirepaymentdiscount.zip bankwirepaymentdiscount/ \
-  -x "*.git*" "CONTRIBUTING.md" "GITHUB_SETUP.md" "LOGO_NEEDED.txt"
+# Or use the included script
+./create-module-package.sh
 ```
 
-**Note**: You need to add a `logo.png` file (140x140px) before distribution. See `LOGO_NEEDED.txt` for requirements.
+**Note**: The module includes a `logo.png` file (140x140px). This is required for proper display in PrestaShop Module Manager.
 
 ## Configuration
 
